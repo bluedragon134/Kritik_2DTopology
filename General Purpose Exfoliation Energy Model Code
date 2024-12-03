@@ -1,0 +1,336 @@
+from matminer.featurizers.composition import ElementProperty
+from pymatgen.core import Composition
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.metrics import mean_absolute_error, r2_score, mean_squared_error
+import tensorflow as tf
+from tensorflow.keras import layers, models
+from sklearn.preprocessing import MultiLabelBinarizer, LabelEncoder
+import numpy as np
+from xgboost import XGBRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.svm import SVR
+from sklearn.impute import SimpleImputer
+
+
+'''Task 0: Define at least 2 more featurization techniques using matminer, create a function argument that takes the technique as input'''
+
+
+def featurize_composition(dataframe, formula_column):
+   """
+   Featurize compositions using ElementProperty from Matminer.
+   """
+   ep_feat = ElementProperty.from_preset("magpie")
+   dataframe['composition'] = dataframe[formula_column].apply(Composition)
+   features = ep_feat.featurize_dataframe(dataframe, 'composition', ignore_errors=True)
+   return features.drop(['composition'], axis=1)
+
+
+
+
+
+
+'''Task 1: Add more sklearn models(Linear Regression and SVM) and define a function (compare_models) that compares MAE between them'''
+'''Task 2: Calculate R2 square and RMSE values apart from MAE and incorporate that in compare_models function'''
+
+
+
+
+
+
+''' Random Forest - Best Hyperparameters: {'max_depth': 20, 'min_samples_leaf': 2, 'min_samples_split': 5, 'n_estimators': 50}
+Best Model MAE: 0.0017442190934628475
+Best Model RMSE: 0.014541826342783282
+Best Model R² Score: 0.995489906951989
+'''
+def train_sklearn_model(X, y):
+
+
+   '''Task 3: Perform hyperparameter optimization using grid search for random forest'''
+
+
+   X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+   model = RandomForestRegressor(n_estimators=100, random_state=42)
+   param_grid = {
+       'n_estimators': [50, 100, 200],
+       'max_depth': [10, 20, None],
+       'min_samples_split': [2, 5, 10],
+       'min_samples_leaf': [1, 2, 4]
+   }
+   grid_search = GridSearchCV(estimator=model, param_grid=param_grid,
+                              scoring='neg_mean_squared_error', cv=5, verbose=2, n_jobs=-1)
+   grid_search.fit(X_train, y_train)
+   best_model = grid_search.best_estimator_
+   print(f"Best Hyperparameters: {grid_search.best_params_}")
+   predictions = best_model.predict(X_test)
+   mae = mean_absolute_error(y_test, predictions)
+   mse = mean_squared_error(y_test, predictions)
+   rmse = np.sqrt(mse)
+   r2 = r2_score(y_test, predictions)
+  
+   print(f"Best Model MAE: {mae}")
+   print(f"Best Model RMSE: {rmse}")
+   print(f"Best Model R² Score: {r2}")
+  
+   return best_model, grid_search.best_params_
+   '''
+   model.fit(X_train, y_train)
+   predictions = model.predict(X_test)
+   mae = mean_absolute_error(y_test, predictions)
+   mse = mean_squared_error(y_test, predictions)
+   rmse = np.sqrt(mse)
+   print(f"Random Forest MAE: {mae}")
+   print(f"Random Forest R² Score: {r2_score(y_test, predictions)}")  # Add this line for R² score
+   print(f"Random Forest RMSE: {rmse}")
+   return model'''
+
+
+
+
+'''Task 4: Perform hyperparameter optimization using grid search for SVM and Linear Regression after defining them'''
+
+
+'''Task 5: Try Leaky Relu activation function and compare with Relu'''
+'''Task 6: Change the no. of layers and no. of neurons to find an optimal combination using grid search'''
+
+
+def train_neural_network(X, y):
+   X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+   model = models.Sequential([
+       layers.Dense(64, input_shape=(X_train.shape[1],)),
+       layers.LeakyReLU(alpha=0.1),  # Leaky ReLU with alpha=0.1
+       layers.Dense(32),
+       layers.LeakyReLU(alpha=0.1),  # Leaky ReLU with alpha=0.1
+       layers.Dense(1)
+   ])
+   '''
+   model = models.Sequential([
+       layers.Dense(64, activation='relu', input_shape=(X_train.shape[1],)),
+       layers.Dense(32, activation='relu'),
+       layers.Dense(1)  # Regression output
+   ])'''
+   model.compile(optimizer='adam', loss='mse', metrics=['mae'])
+   model.fit(X_train, y_train, epochs=50, batch_size=32, verbose=1, validation_split=0.1)
+   test_loss, test_mae = model.evaluate(X_test, y_test)
+   print(f"Neural Network Test MAE: {test_mae}")
+   return model
+
+
+def train_svm_model(X, y):
+   """
+   Train an SVM model and evaluate its performance.
+   """
+
+
+   imputer = SimpleImputer(strategy='mean')
+   X = pd.DataFrame(imputer.fit_transform(X), columns=X.columns if hasattr(X, 'columns') else None)
+  
+
+
+   X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+  
+
+
+   model = SVR(kernel='rbf')
+   model.fit(X_train, y_train)
+  
+
+
+   test_predictions = model.predict(X_test)
+   test_mae = mean_absolute_error(y_test, test_predictions)
+   test_rmse = np.sqrt(mean_squared_error(y_test, test_predictions))
+   test_r2 = r2_score(y_test, test_predictions)
+  
+   print(f"SVM Test MAE: {test_mae}")
+   print(f"SVM Test RMSE: {test_rmse}")
+   print(f"SVM Test R² Score: {test_r2}")
+
+
+   return model
+
+
+
+
+
+
+def train_linear_regression_model(X, y):
+   """
+   Train a Linear Regression model and evaluate its performance.
+   """
+
+
+   imputer = SimpleImputer(strategy='mean')
+   X = pd.DataFrame(imputer.fit_transform(X), columns=X.columns if hasattr(X, 'columns') else None)
+  
+   X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+  
+
+
+   model = LinearRegression()
+   model.fit(X_train, y_train)
+  
+
+
+   test_predictions = model.predict(X_test)
+   test_mae = mean_absolute_error(y_test, test_predictions)
+   test_rmse = np.sqrt(mean_squared_error(y_test, test_predictions))
+   test_r2 = r2_score(y_test, test_predictions)
+  
+   print(f"Linear Regression Test MAE: {test_mae}")
+   print(f"Linear Regression Test RMSE: {test_rmse}")
+   print(f"Linear Regression Test R² Score: {test_r2}")
+
+
+   return model
+
+
+
+
+def train_xgboost_model(X, y):
+   """
+   Train an XGBoost model and evaluate its performance.
+   """
+
+
+   X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+
+   model = XGBRegressor(n_estimators=100, learning_rate=0.1, max_depth=6, random_state=42)
+   model.fit(X_train, y_train)
+  
+
+
+   test_predictions = model.predict(X_test)
+   test_mae = mean_absolute_error(y_test, test_predictions)
+   test_rmse = np.sqrt(mean_squared_error(y_test, test_predictions))
+   test_r2 = r2_score(y_test, test_predictions)
+  
+   print(f"XGBoost Test MAE: {test_mae}")
+   print(f"XGBoost Test RMSE: {test_rmse}")
+   print(f"XGBoost Test R² Score: {test_r2}")
+
+
+   return model
+
+
+
+
+def clean_data(filepath, target_column):
+   """
+   Cleans and preprocesses the dataset:
+   - Removes irrelevant or nested fields.
+   - Handles missing and invalid 'formula_pretty' values.
+   - Featurizes 'formula_pretty' robustly.
+   - Encodes categorical and nested columns.
+   - Ensures numeric data for modeling.
+   """
+
+
+   # Load dataset
+   df = pd.read_csv(filepath)
+
+
+   # Drop irrelevant columns
+   irrelevant_columns = [
+       "id", "creation_task_label", "created_at", "literature_doi",
+       "_tasksbuilder", "source_id", "material_id", "discovery_process",
+       "structure", "bandstructure"
+   ]
+   df = df.drop(columns=irrelevant_columns, errors="ignore")
+
+
+   # Drop rows where the target column is missing
+   df = df.dropna(subset=[target_column])
+
+
+   # Validate 'formula_pretty' and filter invalid rows
+   def safe_parse(formula):
+       try:
+           return Composition(formula)
+       except Exception:
+           return None
+
+
+   df["composition"] = df["formula_pretty"].apply(safe_parse)
+   invalid_rows = df[df["composition"].isnull()]
+   if not invalid_rows.empty:
+       print(f"Dropping {len(invalid_rows)} rows with invalid formulas.")
+   df = df.dropna(subset=["composition"])  # Drop rows with invalid formulas
+
+
+   # One-hot encode 'elements'
+   from sklearn.preprocessing import MultiLabelBinarizer
+   mlb = MultiLabelBinarizer()
+   elements_encoded = mlb.fit_transform(df["elements"])
+   elements_df = pd.DataFrame(elements_encoded, columns=mlb.classes_)
+   df = pd.concat([df, elements_df], axis=1).drop(columns=["elements"])
+
+
+   # Extract spacegroup details
+   df["sg_number"] = df["spacegroup"].apply(lambda x: x.get("number") if isinstance(x, dict) else None)
+   df["crystal_system"] = df["spacegroup"].apply(lambda x: x.get("crystal_system") if isinstance(x, dict) else None)
+   df = df.drop(columns=["spacegroup"])
+
+
+   # Label encode categorical columns
+   categorical_columns = ["chemsys", "sg_symbol", "formula_anonymous"]
+   for col in categorical_columns:
+       le = LabelEncoder()
+       df[col] = le.fit_transform(df[col].astype(str))
+
+
+   # Robust featurization with matminer
+   featurizer = ElementProperty.from_preset("magpie", impute_nan=True)
+   df = featurizer.featurize_dataframe(df, "composition", ignore_errors=True).drop(columns=["composition"])
+
+
+   # Ensure numeric data
+   X = df.select_dtypes(include=[float, int])
+   y = df[target_column]
+
+
+   # Drop rows with NaN in y
+   X, y = X.align(y.dropna(), join="inner", axis=0)
+
+
+   return X, y
+
+
+def is_valid_formula(formula):
+   """
+   Validates if the formula is parsable by pymatgen.
+   """
+   try:
+       if pd.isna(formula):  # Explicitly check for NaN
+           return False
+       _ = Composition(formula)
+       return True
+   except Exception:
+       return False
+
+
+
+
+def main(filepath, target_column):
+   # Clean and preprocess data
+   X, y = clean_data(filepath, target_column)
+
+
+   # Train and evaluate models
+   print("Training Random Forest...")
+   #sklearn_model, params = train_sklearn_model(X, y)
+   #model = train_neural_network(X, y)
+   model = train_linear_regression_model(X, y)
+   #model = train_svm_model(X, y)
+   #sklearn_model = train_neural_network(X, y)
+
+
+   return model
+
+
+
+
+if __name__ == "__main__":
+   sklearn_model = main("/homes/jain504/scratch-lab/Kritik_2DTopology/data/db(in).csv", "exfoliation_energy_per_atom")
+
